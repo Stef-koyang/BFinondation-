@@ -1,115 +1,102 @@
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/router';
+import { useEffect, useRef, useState } from 'react';
+import html2pdf from 'html2pdf.js';
+import dynamic from 'next/dynamic';
+
+// Chargement du graphique dynamiquement
+const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
 
 export default function Dashboard() {
-  const router = useRouter();
-  const [data, setData] = useState([]);
+  const [data, setData] = useState<any[]>([]);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [password, setPassword] = useState('');
+  const tableRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loggedIn = localStorage.getItem('loggedIn');
-    if (!loggedIn) {
-      router.push('/login');
-      return;
-    }
-
     const interval = setInterval(async () => {
-      try {
-        const res = await fetch('/api/data');
-        if (!res.ok) throw new Error('Erreur récupération données');
-        const json = await res.json();
-        setData(json);
-      } catch (err) {
-        console.error('Erreur:', err);
-      }
+      const res = await fetch('/api/data');
+      const json = await res.json();
+      setData(json);
     }, 1000);
-
     return () => clearInterval(interval);
-  }, [router]);
+  }, []);
 
-  const handleLogout = () => {
-    localStorage.removeItem('loggedIn');
-    router.push('/login');
+  const handlePrint = () => {
+    if (!tableRef.current) return;
+    const printWindow = window.open('', '', 'height=700,width=1000');
+    printWindow?.document.write('<html><head><title>Impression</title></head><body>');
+    printWindow?.document.write(tableRef.current.innerHTML);
+    printWindow?.document.write('</body></html>');
+    printWindow?.document.close();
+    printWindow?.print();
   };
 
-  const handlePrint = () => window.print();
-
-  const exportPDF = async () => {
-    const element = document.getElementById('table-data');
-    if (!element) return;
-
-    const html2pdf = (await import('html2pdf.js')).default;
-    html2pdf().from(element).set({
+  const handlePDF = async () => {
+    if (!tableRef.current) return;
+    const element = tableRef.current;
+    const pdf = html2pdf().from(element).set({
       margin: 1,
       filename: 'rapport_inondation.pdf',
       html2canvas: { scale: 2 },
-      jsPDF: { orientation: 'landscape' }
-    }).save();
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    });
+    pdf.save();
   };
 
-  const exportCSV = () => {
-    if (data.length === 0) return;
-    const header = Object.keys(data[0]).join(',');
-    const rows = data.map(obj => Object.values(obj).join(',')).join('\n');
-    const blob = new Blob([header + '\n' + rows], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'rapport_inondation.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+  const handleLogin = () => {
+    if (password === 'admin123') setIsLoggedIn(true);
+    else alert('Mot de passe incorrect');
   };
+
+  if (!isLoggedIn) {
+    return (
+      <div style={{ padding: 50 }}>
+        <h2>Connexion administrateur</h2>
+        <input
+          type="password"
+          placeholder="Mot de passe"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <button onClick={handleLogin}>Connexion</button>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px' }}>
-      <h1>📊 Dashboard Inondation</h1>
+    <div style={{ padding: 20 }}>
+      <h1>Dashboard Inondation</h1>
 
-      <div style={{ marginBottom: '15px' }}>
-        <button onClick={handleLogout} style={{ marginRight: '10px' }}>
-          Se déconnecter
-        </button>
-        <button onClick={handlePrint} style={{ marginRight: '10px' }}>
-          🖨️ Imprimer
-        </button>
-        <button onClick={exportPDF} style={{ marginRight: '10px' }}>
-          📄 Export PDF
-        </button>
-        <button onClick={exportCSV}>
-          📤 Export CSV
-        </button>
+      <div style={{ marginBottom: 20 }}>
+        <button onClick={handlePDF}>📥 Enregistrer en PDF</button>
+        <button onClick={handlePrint} style={{ marginLeft: 10 }}>🖨️ Imprimer</button>
       </div>
 
-      <div id="table-data">
-        <table border="1" cellPadding="6" cellSpacing="0">
+      <div ref={tableRef} id="table-data">
+        <table border={1} cellPadding={6} cellSpacing={0}>
           <thead>
             <tr>
-              <th>Date</th>
-              <th>Niveau</th>
-              <th>Rivière</th>
-              <th>Adresse</th>
-              <th>Distance</th>
-              <th>Responsable</th>
-              <th>Temps</th>
+              <th>Date</th><th>Niveau</th><th>Rivière</th><th>Adresse</th><th>Distance</th>
+              <th>Responsable</th><th>Temps</th>
             </tr>
           </thead>
           <tbody>
-            {data.length === 0 ? (
-              <tr><td colSpan={7}>Chargement des données...</td></tr>
-            ) : (
-              data.map((item, i) => (
-                <tr key={i}>
-                  <td>{item.timestamp}</td>
-                  <td>{item.niveau}</td>
-                  <td>{item.riviere}</td>
-                  <td>{item.adresse}</td>
-                  <td>{item.distance} m</td>
-                  <td>{item.nom_resp} ({item.tel})</td>
-                  <td>{item.elapsed_times?.join('s, ')}s</td>
-                </tr>
-              ))
-            )}
+            {data.map((item, i) => (
+              <tr key={i}>
+                <td>{item.timestamp}</td>
+                <td>{item.niveau}</td>
+                <td>{item.riviere}</td>
+                <td>{item.adresse}</td>
+                <td>{item.distance} m</td>
+                <td>{item.nom_resp} ({item.tel})</td>
+                <td>{item.elapsed_times?.join('s, ')}s</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
+
+      <h2>📊 Graphique de la montée d’eau</h2>
+      <Chart data={data} />
     </div>
   );
 }
