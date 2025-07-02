@@ -1,102 +1,114 @@
-import { useEffect, useRef, useState } from 'react';
-import html2pdf from 'html2pdf.js';
+'use client';
+
+import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
-// Chargement du graphique dynamiquement
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
 
-export default function Dashboard() {
-  const [data, setData] = useState<any[]>([]);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
+const Dashboard = () => {
+  const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const tableRef = useRef<HTMLDivElement>(null);
+  const [data, setData] = useState<any[]>([]);
+  const tableRef = useRef(null);
 
-  useEffect(() => {
-    const interval = setInterval(async () => {
-      const res = await fetch('/api/data');
-      const json = await res.json();
-      setData(json);
-    }, 1000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const handlePrint = () => {
-    if (!tableRef.current) return;
-    const printWindow = window.open('', '', 'height=700,width=1000');
-    printWindow?.document.write('<html><head><title>Impression</title></head><body>');
-    printWindow?.document.write(tableRef.current.innerHTML);
-    printWindow?.document.write('</body></html>');
-    printWindow?.document.close();
-    printWindow?.print();
-  };
-
-  const handlePDF = async () => {
-    if (!tableRef.current) return;
-    const element = tableRef.current;
-    const pdf = html2pdf().from(element).set({
-      margin: 1,
-      filename: 'rapport_inondation.pdf',
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    });
-    pdf.save();
-  };
-
+  // Auth simple
   const handleLogin = () => {
-    if (password === 'admin123') setIsLoggedIn(true);
+    if (password === 'bf2025') setAuthenticated(true);
     else alert('Mot de passe incorrect');
   };
 
-  if (!isLoggedIn) {
+  // Ajout d'une ligne (exemple)
+  const addRow = () => {
+    const newRow = {
+      date: new Date().toLocaleString(),
+      niveauEau: Math.floor(Math.random() * 100),
+    };
+    const newData = [...data, newRow];
+    setData(newData);
+    localStorage.setItem('eau-data', JSON.stringify(newData));
+  };
+
+  // Export PDF
+  const handleExportPDF = async () => {
+    const element = tableRef.current;
+    if (!element) return;
+
+    const html2pdf = (await import('html2pdf.js')).default;
+    html2pdf().from(element).set({
+      margin: 1,
+      filename: 'rapport_inondation.pdf',
+      html2canvas: { scale: 2 },
+      jsPDF: { orientation: 'landscape' },
+    }).save();
+  };
+
+  // Impression
+  const handlePrint = () => {
+    const printContent = tableRef.current?.innerHTML;
+    const win = window.open('', '', 'width=900,height=700');
+    if (win && printContent) {
+      win.document.write('<html><head><title>Impression</title></head><body>');
+      win.document.write(printContent);
+      win.document.write('</body></html>');
+      win.document.close();
+      win.print();
+    }
+  };
+
+  useEffect(() => {
+    const savedData = localStorage.getItem('eau-data');
+    if (savedData) setData(JSON.parse(savedData));
+  }, []);
+
+  if (!authenticated) {
     return (
-      <div style={{ padding: 50 }}>
-        <h2>Connexion administrateur</h2>
+      <div style={{ padding: '2rem', textAlign: 'center' }}>
+        <h2>Authentification</h2>
         <input
           type="password"
           placeholder="Mot de passe"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <button onClick={handleLogin}>Connexion</button>
+        <br /><br />
+        <button onClick={handleLogin}>Se connecter</button>
       </div>
     );
   }
 
   return (
-    <div style={{ padding: 20 }}>
-      <h1>Dashboard Inondation</h1>
+    <div style={{ padding: '2rem' }}>
+      <h1>Système de suivi d'inondation</h1>
 
-      <div style={{ marginBottom: 20 }}>
-        <button onClick={handlePDF}>📥 Enregistrer en PDF</button>
-        <button onClick={handlePrint} style={{ marginLeft: 10 }}>🖨️ Imprimer</button>
+      <div style={{ marginBottom: '1rem' }}>
+        <button onClick={addRow}>Ajouter données</button>
+        <button onClick={handleExportPDF}>Exporter PDF</button>
+        <button onClick={handlePrint}>Imprimer</button>
       </div>
 
-      <div ref={tableRef} id="table-data">
+      <div ref={tableRef}>
         <table border={1} cellPadding={6} cellSpacing={0}>
           <thead>
             <tr>
-              <th>Date</th><th>Niveau</th><th>Rivière</th><th>Adresse</th><th>Distance</th>
-              <th>Responsable</th><th>Temps</th>
+              <th>Date</th>
+              <th>Niveau d'eau (cm)</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((item, i) => (
-              <tr key={i}>
-                <td>{item.timestamp}</td>
-                <td>{item.niveau}</td>
-                <td>{item.riviere}</td>
-                <td>{item.adresse}</td>
-                <td>{item.distance} m</td>
-                <td>{item.nom_resp} ({item.tel})</td>
-                <td>{item.elapsed_times?.join('s, ')}s</td>
+            {data.map((entry, idx) => (
+              <tr key={idx}>
+                <td>{entry.date}</td>
+                <td>{entry.niveauEau}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
 
-      <h2>📊 Graphique de la montée d’eau</h2>
+      <h2 style={{ marginTop: '2rem' }}>Graphique de l'évolution</h2>
       <Chart data={data} />
     </div>
   );
-}
+};
+
+export default Dashboard;
