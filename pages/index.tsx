@@ -134,6 +134,10 @@ const tableRef = useRef<HTMLDivElement>(null);
           <thead>
             <tr>
               <th>Date</th>
+              <th>Rivière</th>
+              <th>Adresse</th>
+              <th>Responsable</th>
+              <th>Estimation</th>
               <th>Niveau d'eau (cm)</th>
               <th>Niveau (capteur)</th>
             </tr>
@@ -152,6 +156,10 @@ const tableRef = useRef<HTMLDivElement>(null);
                 }}
               >
                 <td>{entry.date}</td>
+                <td>{entry.riviere}</td>
+                <td>{entry.adresse}</td>
+                <td>{entry.nom_resp}</td>
+                <td>{entry.estimation}</td>
                 <td>{entry.niveauEau}</td>
                 <td>{entry.niveau}</td>
               </tr>
