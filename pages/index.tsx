@@ -1,4 +1,3 @@
-// index.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -13,7 +12,7 @@ const Dashboard = () => {
   const [password, setPassword] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(false);
-  const tableRef = useRef(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = () => {
     if (password === 'bf2025') setAuthenticated(true);
@@ -25,7 +24,7 @@ const Dashboard = () => {
     const newRow = {
       date: new Date().toLocaleString(),
       niveauEau: Math.floor(Math.random() * 100),
-      niveau
+      niveau,
     };
     const newData = [...data, newRow];
     setData(newData);
@@ -35,18 +34,21 @@ const Dashboard = () => {
   const handleExportPDF = async () => {
     const element = tableRef.current;
     if (!element) return;
-    html2pdf().from(element).set({
-      margin: 1,
-      filename: 'rapport_inondation.pdf',
-      html2canvas: { scale: 2 },
-      jsPDF: { orientation: 'landscape' },
-    }).save();
+    html2pdf()
+      .from(element)
+      .set({
+        margin: 1,
+        filename: 'rapport_inondation.pdf',
+        html2canvas: { scale: 2 },
+        jsPDF: { orientation: 'landscape' },
+      })
+      .save();
   };
 
   const handleExportCSV = () => {
     const headers = ['Date', "Niveau d'eau (cm)", 'Niveau'];
-    const rows = data.map(d => [d.date, d.niveauEau, d.niveau]);
-    const csvContent = [headers, ...rows].map(e => e.join(',')).join('\n');
+    const rows = data.map((d) => [d.date, d.niveauEau, d.niveau]);
+    const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'donnees_inondation.csv');
   };
@@ -79,11 +81,14 @@ const Dashboard = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <br /><br />
+        <br />
+        <br />
         <button onClick={handleLogin}>Se connecter</button>
         <button onClick={() => setPassword('')}>Déconnecter</button>
         <button onClick={() => setDarkMode(!darkMode)}>Mode {darkMode ? 'Jour' : 'Sombre'}</button>
-        <p><a href="#">Mot de passe oublié ?</a></p>
+        <p>
+          <a href="#">Mot de passe oublié ?</a>
+        </p>
       </div>
     );
   }
@@ -115,7 +120,13 @@ const Dashboard = () => {
           </thead>
           <tbody>
             {data.map((entry, idx) => (
-              <tr key={idx} style={{ background: entry.niveau === 3 ? '#ffcccc' : entry.niveau === 2 ? '#fff3cd' : '#d1ecf1' }}>
+              <tr
+                key={idx}
+                style={{
+                  background:
+                    entry.niveau === 3 ? '#ffcccc' : entry.niveau === 2 ? '#fff3cd' : '#d1ecf1',
+                }}
+              >
                 <td>{entry.date}</td>
                 <td>{entry.niveauEau}</td>
                 <td>{entry.niveau}</td>
@@ -132,4 +143,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-
