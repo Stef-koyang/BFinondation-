@@ -2,18 +2,21 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-// Par
-const html2pdf = require('html2pdf.js');
 import { saveAs } from 'file-saver';
 
+// Charger Chart dynamiquement sans SSR
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
+
+// Charger html2pdf uniquement côté client
+const isBrowser = typeof window !== 'undefined';
+const html2pdf = isBrowser ? require('html2pdf.js') : null;
 
 const Dashboard = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(false);
-  const tableRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef(null);
 
   const handleLogin = () => {
     if (password === 'bf2025') setAuthenticated(true);
@@ -33,10 +36,9 @@ const Dashboard = () => {
   };
 
   const handleExportPDF = async () => {
-    const element = tableRef.current;
-    if (!element) return;
+    if (!html2pdf || !tableRef.current) return;
     html2pdf()
-      .from(element)
+      .from(tableRef.current)
       .set({
         margin: 1,
         filename: 'rapport_inondation.pdf',
@@ -95,8 +97,20 @@ const Dashboard = () => {
   }
 
   return (
-    <div style={{ padding: '2rem', background: darkMode ? '#222' : '#fff', color: darkMode ? '#fff' : '#000' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+    <div
+      style={{
+        padding: '2rem',
+        background: darkMode ? '#222' : '#fff',
+        color: darkMode ? '#fff' : '#000',
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}
+      >
         <img src="/logo-gauche.png" alt="Logo Gauche" style={{ height: 50 }} />
         <h1>Système de suivi d'inondation</h1>
         <img src="/logo-droit.png" alt="Logo Droit" style={{ height: 50 }} />
@@ -111,7 +125,12 @@ const Dashboard = () => {
       </div>
 
       <div ref={tableRef}>
-        <table border={1} cellPadding={6} cellSpacing={0} style={{ width: '100%', background: '#f8f9fa' }}>
+        <table
+          border={1}
+          cellPadding={6}
+          cellSpacing={0}
+          style={{ width: '100%', background: '#f8f9fa' }}
+        >
           <thead>
             <tr>
               <th>Date</th>
@@ -125,7 +144,11 @@ const Dashboard = () => {
                 key={idx}
                 style={{
                   background:
-                    entry.niveau === 3 ? '#ffcccc' : entry.niveau === 2 ? '#fff3cd' : '#d1ecf1',
+                    entry.niveau === 3
+                      ? '#ffcccc'
+                      : entry.niveau === 2
+                      ? '#fff3cd'
+                      : '#d1ecf1',
                 }}
               >
                 <td>{entry.date}</td>
