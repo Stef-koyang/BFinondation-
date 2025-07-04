@@ -20,7 +20,7 @@ function readData(): any[] {
   }
 
   if (fs.existsSync(dataFile)) {
-    const raw = fs.readFileSync(dataFile, 'utf-8');
+    const raw = fs.readFileSync(dataFile, 'utf8');
     try {
       return JSON.parse(raw);
     } catch {
@@ -36,7 +36,7 @@ function saveData(data: any[]) {
   if (isVercel) {
     memoryStore = data;
   } else {
-    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2), 'utf8');
   }
 }
 
@@ -55,6 +55,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         estimation,
         timestamp,
       } = req.body;
+
+      console.log('Reçu riviere:', riviere);
 
       if (
         !riviere || !adresse || !nom_resp || !tel ||
