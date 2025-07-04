@@ -16,7 +16,7 @@ const Dashboard = () => {
   const [password, setPassword] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(false);
-  const tableRef = useRef(null);
+const tableRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = () => {
     if (password === 'bf2025') setAuthenticated(true);
