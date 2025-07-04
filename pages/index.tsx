@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
-import html2pdf from 'html2pdf.js';
+// Par
+const html2pdf = require('html2pdf.js');
 import { saveAs } from 'file-saver';
 
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
