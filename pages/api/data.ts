@@ -2,15 +2,23 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import fs from 'fs';
 import path from 'path';
 
+const isVercel = !!process.env.VERCEL;
+
+let memoryStore: any[] = [];
+
 const dataFile = path.join(process.cwd(), 'data', 'database.json');
 
-// Créer le dossier s'il n'existe pas
-if (!fs.existsSync(path.dirname(dataFile))) {
-  fs.mkdirSync(path.dirname(dataFile));
+// Créer le dossier data localement s’il n’existe pas
+if (!isVercel && !fs.existsSync(path.dirname(dataFile))) {
+  fs.mkdirSync(path.dirname(dataFile), { recursive: true });
 }
 
-// Lire les données existantes
-function readData() {
+// Lire les données
+function readData(): any[] {
+  if (isVercel) {
+    return memoryStore;
+  }
+
   if (fs.existsSync(dataFile)) {
     const raw = fs.readFileSync(dataFile, 'utf-8');
     try {
@@ -19,14 +27,20 @@ function readData() {
       return [];
     }
   }
+
   return [];
 }
 
 // Sauvegarder les données
 function saveData(data: any[]) {
-  fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+  if (isVercel) {
+    memoryStore = data;
+  } else {
+    fs.writeFileSync(dataFile, JSON.stringify(data, null, 2));
+  }
 }
 
+// Handler principal
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
     try {
@@ -42,7 +56,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         timestamp,
       } = req.body;
 
-      // Validation minimale
       if (
         !riviere || !adresse || !nom_resp || !tel ||
         typeof distance !== 'number' ||
@@ -65,7 +78,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         temps23,
         estimation,
         timestamp: timestamp || new Date().toISOString(),
-        receivedAt: new Date().toISOString()
+        receivedAt: new Date().toISOString(),
       };
 
       existing.push(newEntry);
@@ -74,12 +87,18 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       return res.status(200).json({ message: 'Données enregistrées avec succès', data: newEntry });
 
     } catch (error) {
-      return res.status(500).json({ error: 'Erreur serveur', details: error });
+      return res.status(500).json({ error: 'Erreur serveur', details: (error as Error).message });
     }
-  } else if (req.method === 'GET') {
-    const entries = readData();
-    return res.status(200).json(entries);
-  } else {
-    return res.status(405).json({ error: 'Méthode non autorisée' });
   }
+
+  if (req.method === 'GET') {
+    try {
+      const entries = readData();
+      return res.status(200).json(entries);
+    } catch (error) {
+      return res.status(500).json({ error: 'Erreur de lecture', details: (error as Error).message });
+    }
+  }
+
+  return res.status(405).json({ error: 'Méthode non autorisée' });
 }
