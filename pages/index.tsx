@@ -1,54 +1,27 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { saveAs } from 'file-saver';
+import TableauDonnées from '../components/TableauDonnées';
 
-// Chargement dynamique du graphique
+// Charger Chart dynamiquement
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
 
-// Importation conditionnelle de html2pdf
 let html2pdf: any = null;
 if (typeof window !== 'undefined') {
   html2pdf = require('html2pdf.js');
 }
 
-interface DonneeInondation {
-  date: string;
-  riviere: string;
-  adresse: string;
-  nom_resp: string;
-  estimation: number;
-  niveauEau: number;
-  niveau: number;
-}
-
 const Dashboard = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [data, setData] = useState<DonneeInondation[]>([]);
   const [darkMode, setDarkMode] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = () => {
     if (password === 'bf2025') setAuthenticated(true);
     else alert('Mot de passe incorrect');
-  };
-
-  const addRow = () => {
-    const niveau = Math.floor(Math.random() * 3) + 1;
-    const newRow: DonneeInondation = {
-      date: new Date().toLocaleString(),
-      riviere: 'Inconnu',
-      adresse: 'Inconnue',
-      nom_resp: 'Inconnu',
-      estimation: 0,
-      niveauEau: Math.floor(Math.random() * 100),
-      niveau,
-    };
-    const newData = [...data, newRow];
-    setData(newData);
-    localStorage.setItem('eau-data', JSON.stringify(newData));
   };
 
   const handleExportPDF = () => {
@@ -66,19 +39,23 @@ const Dashboard = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Rivière', 'Adresse', 'Responsable', 'Estimation', "Niveau d'eau (cm)", 'Niveau'];
-    const rows = data.map((d) => [
-      d.date,
-      d.riviere,
-      d.adresse,
-      d.nom_resp,
-      d.estimation,
-      d.niveauEau,
-      d.niveau,
-    ]);
-    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    saveAs(blob, 'donnees_inondation.csv');
+    fetch('/api/data')
+      .then(res => res.json())
+      .then((json) => {
+        const headers = ['Date', 'Rivière', 'Adresse', 'Responsable', 'Estimation', "Niveau d'eau (cm)", 'Niveau'];
+        const rows = json.map((item: any) => [
+          new Date(item.timestamp || item.receivedAt).toLocaleString(),
+          item.riviere || 'N/A',
+          item.adresse || 'N/A',
+          item.nom_resp || 'N/A',
+          item.estimation ?? 0,
+          item.niveauEau ?? 0,
+          item.niveau ?? 1,
+        ]);
+        const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        saveAs(blob, 'donnees_inondation.csv');
+      });
   };
 
   const handlePrint = () => {
@@ -92,39 +69,6 @@ const Dashboard = () => {
       win.print();
     }
   };
-
-  const fetchData = () => {
-    fetch('/api/data')
-      .then((res) => res.json())
-      .then((json) => {
-        if (Array.isArray(json)) {
-          const formattedData: DonneeInondation[] = json.map((item: any) => ({
-            date: new Date(item.timestamp || item.receivedAt).toLocaleString(),
-            riviere: item.riviere || 'N/A',
-            adresse: item.adresse || 'N/A',
-            nom_resp: item.nom_resp || 'N/A',
-            estimation: item.estimation ?? 0,
-            niveauEau: item.niveauEau ?? 0,
-            niveau: item.niveau ?? 1,
-          }));
-          setData(formattedData);
-          localStorage.setItem('eau-data', JSON.stringify(formattedData));
-        }
-      })
-      .catch((err) => {
-        console.error('Erreur de chargement API:', err);
-        const savedData = localStorage.getItem('eau-data');
-        if (savedData) {
-          setData(JSON.parse(savedData));
-        }
-      });
-  };
-
-  useEffect(() => {
-    fetchData(); // première fois
-    const interval = setInterval(fetchData, 300); // mise à jour toutes les 0.3 seconde
-    return () => clearInterval(interval); // nettoyage à la destruction
-  }, []);
 
   if (!authenticated) {
     return (
@@ -163,7 +107,6 @@ const Dashboard = () => {
       </div>
 
       <div style={{ margin: '1rem 0' }}>
-        <button onClick={addRow}>Ajouter données</button>
         <button onClick={handleExportPDF}>Exporter PDF</button>
         <button onClick={handleExportCSV}>Exporter CSV</button>
         <button onClick={handlePrint}>Imprimer</button>
@@ -171,41 +114,11 @@ const Dashboard = () => {
       </div>
 
       <div ref={tableRef}>
-        <table border={1} cellPadding={6} cellSpacing={0} style={{ width: '100%', background: '#f8f9fa' }}>
-          <thead>
-            <tr>
-              <th>Date</th>
-              <th>Rivière</th>
-              <th>Adresse</th>
-              <th>Responsable</th>
-              <th>Estimation</th>
-              <th>Niveau d'eau (cm)</th>
-              <th>Niveau (capteur)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((entry, idx) => (
-              <tr key={idx} style={{
-                background:
-                  entry.niveau === 3 ? '#ffcccc' :
-                  entry.niveau === 2 ? '#fff3cd' :
-                  '#d1ecf1',
-              }}>
-                <td>{entry.date}</td>
-                <td>{entry.riviere}</td>
-                <td>{entry.adresse}</td>
-                <td>{entry.nom_resp}</td>
-                <td>{entry.estimation}</td>
-                <td>{entry.niveauEau}</td>
-                <td>{entry.niveau}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <TableauDonnées />
       </div>
 
       <h2 style={{ marginTop: '2rem' }}>Graphique de l'évolution</h2>
-      <Chart data={data} />
+      <Chart data={[]} />
     </div>
   );
 };
