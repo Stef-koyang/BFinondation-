@@ -4,17 +4,29 @@ import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { saveAs } from 'file-saver';
 
-// Charger Chart dynamiquement sans SSR
+// Chargement dynamique du graphique
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
 
-// Charger html2pdf uniquement côté client
-const isBrowser = typeof window !== 'undefined';
-const html2pdf = isBrowser ? require('html2pdf.js') : null;
+// Importation conditionnelle de html2pdf
+let html2pdf: any = null;
+if (typeof window !== 'undefined') {
+  html2pdf = require('html2pdf.js');
+}
+
+interface DonneeInondation {
+  date: string;
+  riviere: string;
+  adresse: string;
+  nom_resp: string;
+  estimation: number;
+  niveauEau: number;
+  niveau: number;
+}
 
 const Dashboard = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
-  const [data, setData] = useState<any[]>([]);
+  const [data, setData] = useState<DonneeInondation[]>([]);
   const [darkMode, setDarkMode] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
 
@@ -25,9 +37,9 @@ const Dashboard = () => {
 
   const addRow = () => {
     const niveau = Math.floor(Math.random() * 3) + 1;
-    const newRow = {
+    const newRow: DonneeInondation = {
       date: new Date().toLocaleString(),
-      riviere: 'Inconnu',      // valeur par défaut pour ligne ajoutée
+      riviere: 'Inconnu',
       adresse: 'Inconnue',
       nom_resp: 'Inconnu',
       estimation: 0,
@@ -39,17 +51,18 @@ const Dashboard = () => {
     localStorage.setItem('eau-data', JSON.stringify(newData));
   };
 
-  const handleExportPDF = async () => {
-    if (!html2pdf || !tableRef.current) return;
-    html2pdf()
-      .from(tableRef.current)
-      .set({
-        margin: 1,
-        filename: 'rapport_inondation.pdf',
-        html2canvas: { scale: 2 },
-        jsPDF: { orientation: 'landscape' },
-      })
-      .save();
+  const handleExportPDF = () => {
+    if (html2pdf && tableRef.current) {
+      html2pdf()
+        .from(tableRef.current)
+        .set({
+          margin: 1,
+          filename: 'rapport_inondation.pdf',
+          html2canvas: { scale: 2 },
+          jsPDF: { orientation: 'landscape' },
+        })
+        .save();
+    }
   };
 
   const handleExportCSV = () => {
@@ -63,7 +76,7 @@ const Dashboard = () => {
       d.niveauEau,
       d.niveau,
     ]);
-    const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
+    const csvContent = [headers, ...rows].map((row) => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'donnees_inondation.csv');
   };
@@ -80,32 +93,37 @@ const Dashboard = () => {
     }
   };
 
-  useEffect(() => {
-    // Charger données depuis API
+  const fetchData = () => {
     fetch('/api/data')
       .then((res) => res.json())
       .then((json) => {
         if (Array.isArray(json)) {
-          // Adapter les données API au format attendu
-          const formattedData = json.map((item) => ({
-            date: new Date(item.timestamp).toLocaleString(),
+          const formattedData: DonneeInondation[] = json.map((item: any) => ({
+            date: new Date(item.timestamp || item.receivedAt).toLocaleString(),
             riviere: item.riviere || 'N/A',
             adresse: item.adresse || 'N/A',
             nom_resp: item.nom_resp || 'N/A',
             estimation: item.estimation ?? 0,
-            niveauEau: 0, // aucune donnée niveau eau dans API, valeur par défaut
-            niveau: 1,    // valeur par défaut niveau capteur
+            niveauEau: item.niveauEau ?? 0,
+            niveau: item.niveau ?? 1,
           }));
           setData(formattedData);
           localStorage.setItem('eau-data', JSON.stringify(formattedData));
         }
       })
       .catch((err) => {
-        console.error('Erreur chargement API:', err);
-        // Fallback: charger données locales si API inaccessible
+        console.error('Erreur de chargement API:', err);
         const savedData = localStorage.getItem('eau-data');
-        if (savedData) setData(JSON.parse(savedData));
+        if (savedData) {
+          setData(JSON.parse(savedData));
+        }
       });
+  };
+
+  useEffect(() => {
+    fetchData(); // première fois
+    const interval = setInterval(fetchData, 300); // mise à jour toutes les 0.3 seconde
+    return () => clearInterval(interval); // nettoyage à la destruction
   }, []);
 
   if (!authenticated) {
@@ -119,33 +137,26 @@ const Dashboard = () => {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
-        <br />
-        <br />
+        <br /><br />
         <button onClick={handleLogin}>Se connecter</button>
-        <button onClick={() => setPassword('')}>Déconnecter</button>
+        <button onClick={() => setPassword('')}>Effacer</button>
         <button onClick={() => setDarkMode(!darkMode)}>Mode {darkMode ? 'Jour' : 'Sombre'}</button>
-        <p>
-          <a href="#">Mot de passe oublié ?</a>
-        </p>
+        <p><a href="#">Mot de passe oublié ?</a></p>
       </div>
     );
   }
 
   return (
-    <div
-      style={{
-        padding: '2rem',
-        background: darkMode ? '#222' : '#fff',
-        color: darkMode ? '#fff' : '#000',
-      }}
-    >
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}
-      >
+    <div style={{
+      padding: '2rem',
+      background: darkMode ? '#222' : '#fff',
+      color: darkMode ? '#fff' : '#000',
+    }}>
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+      }}>
         <img src="/logo-gauche.png" alt="Logo Gauche" style={{ height: 50 }} />
         <h1>Système de suivi d'inondation</h1>
         <img src="/logo-droit.png" alt="Logo Droit" style={{ height: 50 }} />
@@ -160,12 +171,7 @@ const Dashboard = () => {
       </div>
 
       <div ref={tableRef}>
-        <table
-          border={1}
-          cellPadding={6}
-          cellSpacing={0}
-          style={{ width: '100%', background: '#f8f9fa' }}
-        >
+        <table border={1} cellPadding={6} cellSpacing={0} style={{ width: '100%', background: '#f8f9fa' }}>
           <thead>
             <tr>
               <th>Date</th>
@@ -179,17 +185,12 @@ const Dashboard = () => {
           </thead>
           <tbody>
             {data.map((entry, idx) => (
-              <tr
-                key={idx}
-                style={{
-                  background:
-                    entry.niveau === 3
-                      ? '#ffcccc'
-                      : entry.niveau === 2
-                      ? '#fff3cd'
-                      : '#d1ecf1',
-                }}
-              >
+              <tr key={idx} style={{
+                background:
+                  entry.niveau === 3 ? '#ffcccc' :
+                  entry.niveau === 2 ? '#fff3cd' :
+                  '#d1ecf1',
+              }}>
                 <td>{entry.date}</td>
                 <td>{entry.riviere}</td>
                 <td>{entry.adresse}</td>
