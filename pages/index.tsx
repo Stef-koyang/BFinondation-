@@ -16,7 +16,7 @@ const Dashboard = () => {
   const [password, setPassword] = useState('');
   const [data, setData] = useState<any[]>([]);
   const [darkMode, setDarkMode] = useState(false);
-const tableRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const handleLogin = () => {
     if (password === 'bf2025') setAuthenticated(true);
@@ -27,6 +27,10 @@ const tableRef = useRef<HTMLDivElement>(null);
     const niveau = Math.floor(Math.random() * 3) + 1;
     const newRow = {
       date: new Date().toLocaleString(),
+      riviere: 'Inconnu',      // valeur par défaut pour ligne ajoutée
+      adresse: 'Inconnue',
+      nom_resp: 'Inconnu',
+      estimation: 0,
       niveauEau: Math.floor(Math.random() * 100),
       niveau,
     };
@@ -49,8 +53,16 @@ const tableRef = useRef<HTMLDivElement>(null);
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', "Niveau d'eau (cm)", 'Niveau'];
-    const rows = data.map((d) => [d.date, d.niveauEau, d.niveau]);
+    const headers = ['Date', 'Rivière', 'Adresse', 'Responsable', 'Estimation', "Niveau d'eau (cm)", 'Niveau'];
+    const rows = data.map((d) => [
+      d.date,
+      d.riviere,
+      d.adresse,
+      d.nom_resp,
+      d.estimation,
+      d.niveauEau,
+      d.niveau,
+    ]);
     const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     saveAs(blob, 'donnees_inondation.csv');
@@ -69,8 +81,31 @@ const tableRef = useRef<HTMLDivElement>(null);
   };
 
   useEffect(() => {
-    const savedData = localStorage.getItem('eau-data');
-    if (savedData) setData(JSON.parse(savedData));
+    // Charger données depuis API
+    fetch('/api/data')
+      .then((res) => res.json())
+      .then((json) => {
+        if (Array.isArray(json)) {
+          // Adapter les données API au format attendu
+          const formattedData = json.map((item) => ({
+            date: new Date(item.timestamp).toLocaleString(),
+            riviere: item.riviere || 'N/A',
+            adresse: item.adresse || 'N/A',
+            nom_resp: item.nom_resp || 'N/A',
+            estimation: item.estimation ?? 0,
+            niveauEau: 0, // aucune donnée niveau eau dans API, valeur par défaut
+            niveau: 1,    // valeur par défaut niveau capteur
+          }));
+          setData(formattedData);
+          localStorage.setItem('eau-data', JSON.stringify(formattedData));
+        }
+      })
+      .catch((err) => {
+        console.error('Erreur chargement API:', err);
+        // Fallback: charger données locales si API inaccessible
+        const savedData = localStorage.getItem('eau-data');
+        if (savedData) setData(JSON.parse(savedData));
+      });
   }, []);
 
   if (!authenticated) {
