@@ -4,10 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { saveAs } from 'file-saver';
 
-// Graphique (chargement dynamique)
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false });
 
-// PDF (chargé uniquement côté client)
 let html2pdf: any = null;
 if (typeof window !== 'undefined') {
   html2pdf = require('html2pdf.js');
@@ -77,6 +75,22 @@ const Dashboard = () => {
     }
   };
 
+  const addRow = () => {
+    const niveau = Math.floor(Math.random() * 3) + 1;
+    const newRow: DonneeInondation = {
+      date: new Date().toLocaleString(),
+      riviere: 'Test',
+      adresse: 'Simulation',
+      nom_resp: 'Simulé',
+      estimation: Math.floor(Math.random() * 100),
+      niveauEau: Math.floor(Math.random() * 150),
+      niveau,
+    };
+    const updatedData = [...data, newRow];
+    setData(updatedData);
+    localStorage.setItem('eau-data', JSON.stringify(updatedData));
+  };
+
   const fetchData = () => {
     fetch('/api/data')
       .then(res => res.json())
@@ -101,10 +115,9 @@ const Dashboard = () => {
       });
   };
 
-  // Mise à jour automatique du tableau
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 300); // 0.3 seconde
+    const interval = setInterval(fetchData, 300); // Mise à jour toutes les 0.3s
     return () => clearInterval(interval);
   }, []);
 
@@ -143,6 +156,7 @@ const Dashboard = () => {
       </div>
 
       <div style={{ margin: '1rem 0' }}>
+        <button onClick={addRow}>Ajouter données</button>
         <button onClick={handleExportPDF}>Exporter PDF</button>
         <button onClick={handleExportCSV}>Exporter CSV</button>
         <button onClick={handlePrint}>Imprimer</button>
