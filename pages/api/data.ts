@@ -40,6 +40,13 @@ function saveData(data: any[]) {
   }
 }
 
+// Fonction pour valider et convertir un champ en nombre
+function parseNumber(value: any): number | null {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'string' && !isNaN(Number(value))) return Number(value);
+  return null;
+}
+
 // Handler principal
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'POST') {
@@ -58,12 +65,21 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
       console.log('Reçu riviere:', riviere);
 
+      // Validation et conversion des nombres
+      const distanceNum = parseNumber(distance);
+      const temps12Num = parseNumber(temps12);
+      const temps23Num = parseNumber(temps23);
+      const estimationNum = parseNumber(estimation);
+
       if (
-        !riviere || !adresse || !nom_resp || !tel ||
-        typeof distance !== 'number' ||
-        typeof temps12 !== 'number' ||
-        typeof temps23 !== 'number' ||
-        typeof estimation !== 'number'
+        !riviere ||
+        !adresse ||
+        !nom_resp ||
+        !tel ||
+        distanceNum === null ||
+        temps12Num === null ||
+        temps23Num === null ||
+        estimationNum === null
       ) {
         return res.status(400).json({ error: 'Champs manquants ou invalides' });
       }
@@ -73,12 +89,12 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       const newEntry = {
         riviere,
         adresse,
-        distance,
+        distance: distanceNum,
         nom_resp,
         tel,
-        temps12,
-        temps23,
-        estimation,
+        temps12: temps12Num,
+        temps23: temps23Num,
+        estimation: estimationNum,
         timestamp: timestamp || new Date().toISOString(),
         receivedAt: new Date().toISOString(),
       };
