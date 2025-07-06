@@ -26,11 +26,50 @@ const Dashboard = () => {
   const [password, setPassword] = useState('');
   const [darkMode, setDarkMode] = useState(false);
   const [data, setData] = useState<DonneeInondation[]>([]);
+  const [paused, setPaused] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
-  const handleLogin = () => {
-    if (password === 'bf2025') setAuthenticated(true);
-    else alert('Mot de passe incorrect');
+  const fetchData = async () => {
+    if (paused) return;
+
+    try {
+      const res = await fetch('/api/data');
+      const json = await res.json();
+
+      if (Array.isArray(json)) {
+        const formatted = json.map((item: any) => {
+          const estimation = item.estimation ?? 0;
+          const niveau = estimation >= 80 ? 3 : estimation >= 50 ? 2 : 1;
+
+          if (niveau === 3 || estimation > 70) {
+            playAlert(); // Alerte si estimation élevée
+          }
+
+          return {
+            date: new Date(item.timestamp || item.receivedAt).toLocaleString(),
+            riviere: item.riviere || 'N/A',
+            adresse: item.adresse || 'N/A',
+            nom_resp: item.nom_resp || 'N/A',
+            estimation,
+            niveauEau: item.niveauEau ?? estimation, // estimation = niveau eau
+            niveau,
+          };
+        });
+
+        setData(formatted);
+        localStorage.setItem('eau-data', JSON.stringify(formatted));
+      }
+    } catch (error) {
+      const saved = localStorage.getItem('eau-data');
+      if (saved) setData(JSON.parse(saved));
+    }
+  };
+
+  const playAlert = () => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(() => {});
+    }
   };
 
   const handleExportPDF = () => {
@@ -75,51 +114,11 @@ const Dashboard = () => {
     }
   };
 
-  const addRow = () => {
-    const niveau = Math.floor(Math.random() * 3) + 1;
-    const newRow: DonneeInondation = {
-      date: new Date().toLocaleString(),
-      riviere: 'Test',
-      adresse: 'Simulation',
-      nom_resp: 'Simulé',
-      estimation: Math.floor(Math.random() * 100),
-      niveauEau: Math.floor(Math.random() * 150),
-      niveau,
-    };
-    const updatedData = [...data, newRow];
-    setData(updatedData);
-    localStorage.setItem('eau-data', JSON.stringify(updatedData));
-  };
-
-  const fetchData = () => {
-    fetch('/api/data')
-      .then(res => res.json())
-      .then(json => {
-        if (Array.isArray(json)) {
-          const formatted = json.map((item: any) => ({
-            date: new Date(item.timestamp || item.receivedAt).toLocaleString(),
-            riviere: item.riviere || 'N/A',
-            adresse: item.adresse || 'N/A',
-            nom_resp: item.nom_resp || 'N/A',
-            estimation: item.estimation ?? 0,
-            niveauEau: item.niveauEau ?? 0,
-            niveau: item.niveau ?? 1,
-          }));
-          setData(formatted);
-          localStorage.setItem('eau-data', JSON.stringify(formatted));
-        }
-      })
-      .catch(() => {
-        const saved = localStorage.getItem('eau-data');
-        if (saved) setData(JSON.parse(saved));
-      });
-  };
-
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 300); // Mise à jour toutes les 0.3s
+    fetchData(); // 1ère fois
+    const interval = setInterval(fetchData, 1000); // toutes les 1s
     return () => clearInterval(interval);
-  }, []);
+  }, [paused]);
 
   if (!authenticated) {
     return (
@@ -133,10 +132,8 @@ const Dashboard = () => {
           onChange={(e) => setPassword(e.target.value)}
         />
         <br /><br />
-        <button onClick={handleLogin}>Se connecter</button>
+        <button onClick={() => setAuthenticated(password === 'bf2025')}>Se connecter</button>
         <button onClick={() => setPassword('')}>Effacer</button>
-        <button onClick={() => setDarkMode(!darkMode)}>Mode {darkMode ? 'Jour' : 'Sombre'}</button>
-        <p><a href="#">Mot de passe oublié ?</a></p>
       </div>
     );
   }
@@ -149,6 +146,7 @@ const Dashboard = () => {
         color: darkMode ? '#fff' : '#000',
       }}
     >
+      <audio ref={audioRef} src="/alert.mp3" preload="auto" />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <img src="/logo-gauche.png" alt="Logo Gauche" style={{ height: 50 }} />
         <h1>Système de suivi d'inondation</h1>
@@ -156,11 +154,13 @@ const Dashboard = () => {
       </div>
 
       <div style={{ margin: '1rem 0' }}>
-        <button onClick={addRow}>Ajouter données</button>
         <button onClick={handleExportPDF}>Exporter PDF</button>
         <button onClick={handleExportCSV}>Exporter CSV</button>
         <button onClick={handlePrint}>Imprimer</button>
         <button onClick={() => setDarkMode(!darkMode)}>Mode {darkMode ? 'Jour' : 'Sombre'}</button>
+        <button onClick={() => setPaused(!paused)} style={{ background: paused ? 'red' : 'green', color: '#fff' }}>
+          {paused ? 'Reprendre' : 'Pause'}
+        </button>
       </div>
 
       <div ref={tableRef}>
@@ -173,7 +173,7 @@ const Dashboard = () => {
               <th>Responsable</th>
               <th>Estimation</th>
               <th>Niveau d'eau (cm)</th>
-              <th>Niveau (capteur)</th>
+              <th>Niveau</th>
             </tr>
           </thead>
           <tbody>
@@ -183,10 +183,12 @@ const Dashboard = () => {
                 style={{
                   background:
                     entry.niveau === 3
-                      ? '#ffcccc'
+                      ? '#ff0000'
                       : entry.niveau === 2
                       ? '#fff3cd'
                       : '#d1ecf1',
+                  color: entry.niveau === 3 ? '#fff' : undefined,
+                  animation: entry.niveau === 3 ? 'flash 1s infinite' : undefined,
                 }}
               >
                 <td>{entry.date}</td>
@@ -204,6 +206,14 @@ const Dashboard = () => {
 
       <h2 style={{ marginTop: '2rem' }}>Graphique de l'évolution</h2>
       <Chart data={data} />
+
+      <style>{`
+        @keyframes flash {
+          0% { background-color: #ff0000; }
+          50% { background-color: #cc0000; }
+          100% { background-color: #ff0000; }
+        }
+      `}</style>
     </div>
   );
 };
