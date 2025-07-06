@@ -123,7 +123,7 @@ const Dashboard = () => {
   if (!authenticated) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center' }}>
-        <img src="../IMG/Logo_bf.png" alt="User Logo" style={{ width: 80 }} />
+        <img src='../IMG/Logo_bf.png' alt="CEO DX" style={{ width: 80 }} />
         <h2>Authentification</h2>
         <input
           type="password"
