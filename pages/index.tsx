@@ -16,6 +16,10 @@ interface DonneeInondation {
   riviere: string;
   adresse: string;
   nom_resp: string;
+  tel: string;
+  distance: number;
+  temps12: number;
+  temps23: number;
   estimation: number;
   niveauEau: number;
   niveau: number;
@@ -43,7 +47,7 @@ const Dashboard = () => {
           const niveau = estimation >= 80 ? 3 : estimation >= 50 ? 2 : 1;
 
           if (niveau === 3 || estimation > 70) {
-            playAlert(); // Alerte si estimation élevée
+            playAlert();
           }
 
           return {
@@ -51,8 +55,12 @@ const Dashboard = () => {
             riviere: item.riviere || 'N/A',
             adresse: item.adresse || 'N/A',
             nom_resp: item.nom_resp || 'N/A',
+            tel: item.tel || 'N/A',
+            distance: item.distance ?? 0,
+            temps12: item.temps12 ?? 0,
+            temps23: item.temps23 ?? 0,
             estimation,
-            niveauEau: item.niveauEau ?? estimation, // estimation = niveau eau
+            niveauEau: item.niveauEau ?? estimation,
             niveau,
           };
         });
@@ -87,15 +95,31 @@ const Dashboard = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = ['Date', 'Rivière', 'Adresse', 'Responsable', 'Estimation', "Niveau d'eau (cm)", 'Niveau'];
+    const headers = [
+      'Date',
+      'Rivière',
+      'Adresse',
+      'Responsable',
+      'Téléphone',
+      'Distance (cm)',
+      'Temps 1→2 (s)',
+      'Temps 2→3 (s)',
+      'Estimation',
+      "Niveau d'eau (cm)",
+      'Niveau'
+    ];
     const rows = data.map((item) => [
       item.date,
       item.riviere,
       item.adresse,
       item.nom_resp,
-      item.estimation,
-      item.niveauEau,
-      item.niveau,
+      item.tel,
+      item.distance.toString(),
+      item.temps12.toString(),
+      item.temps23.toString(),
+      item.estimation.toString(),
+      item.niveauEau.toString(),
+      item.niveau.toString(),
     ]);
     const csvContent = [headers, ...rows].map((e) => e.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -115,8 +139,8 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    fetchData(); // 1ère fois
-    const interval = setInterval(fetchData, 1000); // toutes les 1s
+    fetchData();
+    const interval = setInterval(fetchData, 1000);
     return () => clearInterval(interval);
   }, [paused]);
 
@@ -158,19 +182,31 @@ const Dashboard = () => {
         <button onClick={handleExportCSV}>Exporter CSV</button>
         <button onClick={handlePrint}>Imprimer</button>
         <button onClick={() => setDarkMode(!darkMode)}>Mode {darkMode ? 'Jour' : 'Sombre'}</button>
-        <button onClick={() => setPaused(!paused)} style={{ background: paused ? 'red' : 'green', color: '#fff' }}>
+        <button
+          onClick={() => setPaused(!paused)}
+          style={{ background: paused ? 'red' : 'green', color: '#fff' }}
+        >
           {paused ? 'Reprendre' : 'Pause'}
         </button>
       </div>
 
       <div ref={tableRef}>
-        <table border={1} cellPadding={6} cellSpacing={0} style={{ width: '100%', background: '#f8f9fa' }}>
+        <table
+          border={1}
+          cellPadding={6}
+          cellSpacing={0}
+          style={{ width: '100%', background: '#f8f9fa' }}
+        >
           <thead>
             <tr>
               <th>Date</th>
               <th>Rivière</th>
               <th>Adresse</th>
               <th>Responsable</th>
+              <th>Téléphone</th>
+              <th>Distance (cm)</th>
+              <th>Temps 1→2 (s)</th>
+              <th>Temps 2→3 (s)</th>
               <th>Estimation</th>
               <th>Niveau d'eau (cm)</th>
               <th>Niveau</th>
@@ -195,6 +231,10 @@ const Dashboard = () => {
                 <td>{entry.riviere}</td>
                 <td>{entry.adresse}</td>
                 <td>{entry.nom_resp}</td>
+                <td>{entry.tel}</td>
+                <td>{entry.distance}</td>
+                <td>{entry.temps12}</td>
+                <td>{entry.temps23}</td>
                 <td>{entry.estimation}</td>
                 <td>{entry.niveauEau}</td>
                 <td>{entry.niveau}</td>
