@@ -34,7 +34,7 @@ const Dashboard = () => {
     if (paused) return;
 
     try {
-      const res = await fetch('/api/data');
+      const res = await fetch('https://b-finondation.vercel.app/api/data');
       const json = await res.json();
 
       if (Array.isArray(json)) {
